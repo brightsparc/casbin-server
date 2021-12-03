@@ -26,6 +26,7 @@ import (
 	"github.com/casbin/casbin/v2/persist"
 	fileadapter "github.com/casbin/casbin/v2/persist/file-adapter"
 	gormadapter "github.com/casbin/gorm-adapter/v2"
+	redisadapter "github.com/casbin/redis-adapter/v2"
 	//_ "github.com/jinzhu/gorm/dialects/mssql"
 	//_ "github.com/jinzhu/gorm/dialects/mysql"
 	//_ "github.com/jinzhu/gorm/dialects/postgres"
@@ -36,11 +37,13 @@ var errDriverName = errors.New("currently supported DriverName: file | mysql | p
 func newAdapter(in *pb.NewAdapterRequest) (persist.Adapter, error) {
 	var a persist.Adapter
 	in = checkLocalConfig(in)
-	supportDriverNames := [...]string{"file", "mysql", "postgres", "mssql"}
+	supportDriverNames := [...]string{"file", "redis", "mysql", "postgres", "mssql"}
 
 	switch in.DriverName {
 	case "file":
 		a = fileadapter.NewAdapter(in.ConnectString)
+	case "redis":
+		a = redisadapter.NewAdapter("tcp", in.ConnectString)
 	default:
 		var support = false
 		for _, driverName := range supportDriverNames {

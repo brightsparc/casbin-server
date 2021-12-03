@@ -1,0 +1,39 @@
+version: '3.7'
+
+volumes:
+  redis_data: {}
+  prometheus_data: {}
+
+services:
+  casbin:
+    build: .
+    ports:
+      - 50051:50051
+      - 8051:8051
+    depends_on:
+      - redis
+    restart: always
+
+  redis:
+    image: redis:5.0.7
+    volumes:
+      - redis_data:/data
+    ports:
+      - 6379:6379
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    depends_on:
+      - casbin      
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: always      

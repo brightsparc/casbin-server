@@ -1,0 +1,5 @@
+{
+    "driver": "redis",
+    "connection": ":6379",
+    "enforcer": "examples/rbac_model.conf"
+}

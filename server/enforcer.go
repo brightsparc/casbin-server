@@ -30,6 +30,7 @@ import (
 type Server struct {
 	enforcerMap map[int]*casbin.Enforcer
 	adapterMap  map[int]persist.Adapter
+	pb.UnimplementedCasbinServer
 }
 
 func NewServer() *Server {

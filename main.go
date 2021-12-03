@@ -21,16 +21,24 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	pb "github.com/casbin/casbin-server/proto"
 	"github.com/casbin/casbin-server/server"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 )
 
 func main() {
-	var port int
+	var port, metricsPort int
 	flag.IntVar(&port, "port", 50051, "listening port")
+	flag.IntVar(&metricsPort, "metricsPort", 8051, "metrics port")
 	flag.Parse()
 
 	if port < 1 || port > 65535 {
@@ -41,12 +49,39 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+	)
 	pb.RegisterCasbinServer(s, server.NewServer())
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
-	log.Println("Listening on", port)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+
+	// Register Prometheus metrics with latency handler.
+	// see: https://github.com/grpc-ecosystem/go-grpc-prometheus#histograms
+	grpc_prometheus.EnableHandlingTimeHistogram()
+	grpc_prometheus.Register(s)
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	// Listen on both ports
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		log.Println("Metrics on", metricsPort)
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", metricsPort), mux); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+	go func() {
+		log.Println("Listening on", port)
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+
+	<-done
+	s.GracefulStop()
+	log.Print("Server Stopped")
 }

@@ -14,3 +14,6 @@ casbin-server
 
 .idea/
 *.iml
+
+# Mac OSX specific files
+.DS_Store

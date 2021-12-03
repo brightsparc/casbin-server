@@ -32,10 +32,20 @@ Contributions for clients in other languages are welcome :)
 
 ### Protobuf (if not installed):
 
-As Casbin-Server uses ``gRPC``, you need to [install Protocol Buffers](https://github.com/golang/protobuf#installation) first to generate the ``.proto`` file. The command is:
+As Casbin-Server uses ``gRPC``, you need to [install Protocol Buffers](https://github.com/golang/protobuf#installation) first.  On a mac run the following:
 
 ```
-protoc -I proto --go_out=plugins=grpc:proto proto/casbin.proto
+brew install protobuf
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
+To generate the `pb` and `grpc` files relative to the ``.proto`` source file, run:
+
+```
+protoc --go_out=. --go_opt=paths=source_relative \
+    --go-grpc_out=. --go-grpc_opt=require_unimplemented_servers=false \
+    --go-grpc_opt=paths=source_relative proto/casbin.proto
 ```
 
 Alternatively, you can also [run it from an IDE](https://github.com/casbin/casbin-server/blob/6b46c48c8845dc1b8021f2872be08b8e1a62b092/main.go#L15).
@@ -72,6 +82,33 @@ Casbin-Server also supports the ABAC model as the Casbin library does. You may w
 
 3. The Go struct is limited to 11 members at most. If you want to have more members, you should modify [Casbin-Server's source code](https://github.com/casbin/casbin-server/blob/5e21d10e863c7d8461f951417eb1c63fa00204fb/server/abac.go#L27-L40) by adding more members and rebuild it.
 
+## Monitoring
+
+The server publishes [go-grpc-prometheus](https://github.com/grpc-ecosystem/go-grpc-prometheus) metrics on port `8051` by default.
+
+It includes [histograms](https://github.com/grpc-ecosystem/go-grpc-prometheus#histograms) for monitoring the performance.
+
+You can get the total request in the last 5 minutes with following:
+
+```
+sum(rate(grpc_server_started_total{job="casbin"}[5m])) by (grpc_service)
+```
+
+You can also get the p99 metrics for various methods.
+
+```
+histogram_quantile(0.99,
+  sum(rate(grpc_server_handling_seconds_bucket{job="casbin"}[5m])) by (grpc_method,le)
+)
+```
+
+## Running Server
+
+Run the following to build the `casbin-server` in docker, and deploy with a `redis` database, and `prometheus` monitoring.
+
+```
+docker-compose -f docker-compose.yml up
+```
 ## Getting Help
 
 - [Casbin](https://github.com/casbin/casbin)
